@@ -25,7 +25,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     hostname: kafka
-    container_name: kafka
+    container_name: kafka-order-processor
     depends_on:
       - zookeeper
     ports:
@@ -156,6 +156,53 @@ services:
       kafka-topics --describe --bootstrap-server kafka:9092 --topic orders-placed
       "
 
+  # PostgreSQL Database - Order and Inventory storage
+  postgres:
+    image: postgres:15-alpine
+    hostname: postgres
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+
+      # Performance tuning for high throughput
+      POSTGRES_MAX_CONNECTIONS: 500
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+      POSTGRES_WAL_BUFFERS: 16MB
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    networks:
+      - kafka-network
+    command: >
+      postgres
+      -c max_connections=500
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=10MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c synchronous_commit=off
+      -c log_statement=all
+      -c log_duration=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # Producer Service - Gin API
   producer:
     build:
@@ -181,7 +228,7 @@ services:
       timeout: 5s
       retries: 3
 
-  # Consumer Service - Order processor
+  # Consumer Service - Order processor with inventory management
   consumer:
     build:
       context: ./consumer
@@ -190,15 +237,27 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
+      # Kafka configuration
       KAFKA_BROKERS: "kafka:9092"
       KAFKA_TOPIC: "orders-placed"
-      CONSUMER_GROUP_ID: "order-consumer-group"
+      CONSUMER_GROUP_ID: "order-inventory-group"
+
+      # Database configuration
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "orderapp"
+      DB_PASSWORD: "changeme"
+      DB_NAME: "postgres"
+      DB_SSLMODE: "disable"
+
     networks:
       - kafka-network
     restart: unless-stopped
     deploy:
-      replicas: 1  # Scale up for higher throughput
+      replicas: 1  # Scale up for higher throughput (docker-compose up --scale consumer=5)
 
   # Optional: Kafka UI for monitoring
   kafka-ui:
@@ -223,3 +282,4 @@ volumes:
   zookeeper-data:
   zookeeper-logs:
   kafka-data:
+  postgres-data:

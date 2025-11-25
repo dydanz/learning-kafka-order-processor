@@ -37,18 +37,18 @@ func NewProducerService(brokers []string, topic string) (*ProducerService, error
 	config := sarama.NewConfig()
 
 	// Producer optimization for high throughput
-	config.Producer.RequiredAcks = sarama.WaitForLocal        // acks=1: balance between throughput and durability
-	config.Producer.Compression = sarama.CompressionSnappy    // Fast compression, reduces network I/O
-	config.Producer.Flush.Messages = 1000                     // Batch 1000 messages
+	config.Producer.RequiredAcks = sarama.WaitForAll       // acks=all: required for idempotent producer
+	config.Producer.Compression = sarama.CompressionSnappy // Fast compression, reduces network I/O
+	config.Producer.Flush.Messages = 1000                  // Batch 1000 messages
 	config.Producer.Flush.MaxMessages = 1000
-	config.Producer.Flush.Frequency = 10 * time.Millisecond   // Max 10ms batching delay
-	config.Producer.Return.Successes = false                  // Async mode: don't wait for success
-	config.Producer.Return.Errors = true                      // But do track errors
-	config.Producer.MaxMessageBytes = 1048576                 // 1MB max message size
-	config.Net.MaxOpenRequests = 5                            // Pipeline up to 5 requests
-	config.Producer.Idempotent = true                         // Enable idempotence for exactly-once
-	config.Producer.Retry.Max = 3                             // Retry failed sends 3 times
-	config.Version = sarama.V3_0_0_0                          // Use recent Kafka version
+	config.Producer.Flush.Frequency = 10 * time.Millisecond // Max 10ms batching delay
+	config.Producer.Return.Successes = false                // Async mode: don't wait for success
+	config.Producer.Return.Errors = true                    // But do track errors
+	config.Producer.MaxMessageBytes = 1048576               // 1MB max message size
+	config.Net.MaxOpenRequests = 1                          // Must be 1 for idempotent producer
+	config.Producer.Idempotent = true                       // Enable idempotence for exactly-once
+	config.Producer.Retry.Max = 3                           // Retry failed sends 3 times
+	config.Version = sarama.V3_0_0_0                        // Use recent Kafka version
 
 	// Create async producer for maximum throughput
 	producer, err := sarama.NewAsyncProducer(brokers, config)
