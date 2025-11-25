@@ -248,7 +248,7 @@ Big thanks to AI for helping me figure out these numbers!
 - Storage: 20 TB NVMe SSD
 - IOPS: 750,000+ sustained
 
-*Note: I haven't actually built this mega-setup in real life. Hopefully someone out there will prove it works!*
+*\*\*Note: I haven't actually built this mega-setup in real life. The time the code was committed to GitHub, I was still running benchmark tests on Mac M4.*
 
 ---
 
